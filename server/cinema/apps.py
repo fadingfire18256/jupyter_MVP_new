@@ -19,4 +19,7 @@ class CinemaConfig(AppConfig):
         """
         from movieapp import config
 
+        # 只跑 build_modules.py 就直接啟動服務的人不會經過 notebook，
+        # 這裡補一次，確保 .env 檔案在（值可能是空的，用網頁上的按鈕填）
+        config.ensure_env_file()
         config.set_interactive(False)

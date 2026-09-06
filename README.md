@@ -45,7 +45,7 @@ jupyter notebook          # 或 jupyter lab
 ```
 jupyter_MVP/
 ├── notebooks/              課程本體，六本依序做
-├── .env                    課程共用金鑰（沒有也能上課，程式會當場問）
+├── .env                    你的金鑰（程式自動建立，不進版控）
 ├── build_modules.py        講師捷徑：一次生出所有檔案
 │
 │   ↓ 以下全部由 notebook 產生 ↓
@@ -99,19 +99,27 @@ notebook cell 裡的程式碼**沒辦法被其他 notebook 或網頁服務使用
 
 ## 金鑰
 
-`.env` 裡已填入課程共用的 TMDB 和 Gemini 金鑰，兩把都是免費額度。
+**金鑰不進版控。** 版本庫裡只有 `.env.example`（值是空的），
+`.env` 在 `.gitignore` 裡。
 
-**沒有 `.env` 也能上課** —— `config.get_key()` 會在需要的那一刻跳出輸入提示，
-輸入內容不會留在 notebook 的輸出裡。申請網址寫在 `.env.example`。
+第一次跑 `00_環境設定.ipynb` 或啟動伺服器時，`config.ensure_env_file()`
+會建一份空的 `.env`。填法兩種，寫的是同一個檔案：
 
-> **Gemini 的免費額度是按金鑰計算的。** 全班共用一把時，
-> 大家同時發問會有人收到 429。程式會把這個錯誤翻譯成看得懂的中文說明，
-> 學員可以等幾分鐘或換自己的金鑰。
+1. 網頁篩選列右邊的「API 金鑰」按鈕 —— 存下去立刻生效，不必重啟
+2. 直接編輯專案根目錄的 `.env`
 
-### 換成自己的金鑰
+金鑰沒設定時網頁會自己跳出設定視窗，按鈕也會變成紅色提醒。
 
-網頁篩選列右邊有一顆「API 金鑰」按鈕，貼上自己申請的金鑰存檔，
-會寫進 `.env` 並立刻生效，不必重啟伺服器。金鑰沒設定時會自己跳出來。
+> `ensure_env_file()` **絕不覆蓋既有的 `.env`**，重跑幾次都不會把金鑰清掉。
+>
+> 為什麼要特地建這個檔案？因為 `.env` 是隱藏檔，經雲端硬碟同步、解壓縮、
+> 或只複製 `notebooks/` 過去時很容易掉，而 Windows 的檔案總管又不讓你
+> 把檔案命名成 `.env`（點開頭的檔名會被吃掉）。
+
+> **Gemini 的免費額度是按金鑰計算的。** 好幾個人共用一把時，
+> 同時發問會有人收到 429。程式會把這個錯誤翻譯成看得懂的中文說明。
+
+### 金鑰設定的實作
 
 實作上有三件事是刻意的，可以當教材講：
 
@@ -134,7 +142,7 @@ notebook cell 裡的程式碼**沒辦法被其他 notebook 或網頁服務使用
 
 ## 講師備註
 
-- `build_modules.py` 直接從 notebook 生出**全部 20 個檔案**（不需要 Jupyter），
+- `build_modules.py` 直接從 notebook 生出**全部 19 個檔案**（不需要 Jupyter），
   用來快速確認教材改動後還跑不跑得動，或第一堂課先展示完成品。
 - 打包給學員前記得清掉 notebook 的執行結果：
   `jupyter nbconvert --ClearOutputPreprocessor.enabled=True --inplace notebooks/*.ipynb`

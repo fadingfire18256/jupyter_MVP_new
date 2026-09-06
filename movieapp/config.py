@@ -63,6 +63,25 @@ def load_env(path: str | Path | None = None, override: bool = False) -> dict:
     return loaded
 
 
+def ensure_env_file() -> Path:
+    """.env 不存在就建一份空的（只有欄位名稱和說明）。**絕不覆蓋既有的檔案。**
+
+    為什麼需要這個？因為 .env 是隱藏檔，用雲端硬碟同步、解壓縮、
+    或只複製 notebooks/ 過去時很容易掉。而且 Windows 的檔案總管
+    不讓你把檔案命名成 .env（點開頭的檔名會被吃掉），手動補很麻煩。
+
+    金鑰不進版控，所以這裡只負責「把空的檔案準備好」，
+    值請用網頁上的「API 金鑰」按鈕填，或直接編輯這個檔案。
+    """
+    target = env_path()
+    if target.exists():
+        return target
+
+    lines = _ENV_HEADER + [f"{TMDB_KEY_NAME}=", f"{GEMINI_KEY_NAME}="]
+    target.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return target
+
+
 def _ask_key(name: str) -> str:
     """.env 沒有金鑰時，當場請使用者輸入（輸入內容不會留在 notebook 輸出裡）。"""
     try:
@@ -131,11 +150,16 @@ def key_status() -> dict:
     return {"tmdb": has_key(TMDB_KEY_NAME), "gemini": has_key(GEMINI_KEY_NAME)}
 
 
+# 新建 .env 時放在最前面的說明。這個檔案不進版控。
 _ENV_HEADER = [
-    "# 這個檔案放金鑰，內容不會顯示在 notebook 的輸出裡。",
+    "# 金鑰放這裡。這個檔案不進版控，內容也不會出現在 notebook 的輸出裡。",
     "#",
-    "# 可以直接編輯，也可以在網頁右上角的「API 金鑰」按鈕裡填 ——",
-    "# 兩條路寫的是同一個檔案。",
+    "# 填法有兩種，寫的是同一個檔案：",
+    "#   1. 網頁跑起來後，用篩選列右邊的「API 金鑰」按鈕貼上",
+    "#   2. 直接編輯這個檔案",
+    "#",
+    "# TMDB   : https://www.themoviedb.org/settings/api  取得 Read Access Token",
+    "# Gemini : https://aistudio.google.com/apikey       取得 API Key",
     "",
 ]
 
@@ -185,6 +209,7 @@ def setup(requires=()) -> None:
     """
     if str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))
+    ensure_env_file()
     load_env()
 
     missing = [m for m in requires if not (PKG_DIR / f"{m}.py").exists()]
