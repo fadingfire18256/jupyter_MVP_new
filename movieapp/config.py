@@ -34,13 +34,18 @@ _MODULE_OWNER = {
 # --------------------------------------------------------------------------
 # 金鑰
 # --------------------------------------------------------------------------
+def env_path() -> Path:
+    """.env 的位置。整個專案只有這裡決定它在哪。"""
+    return ROOT / ".env"
+
+
 def load_env(path: str | Path | None = None, override: bool = False) -> dict:
     """讀取 .env 檔並寫進 os.environ。
 
     極簡實作，不依賴 python-dotenv —— 只認 KEY=VALUE，# 開頭是註解。
     .env 不存在也沒關係，get_key() 會在需要時當場詢問。
     """
-    target = Path(path) if path else ROOT / ".env"
+    target = Path(path) if path else env_path()
     if not target.exists():
         return {}
 
@@ -71,13 +76,26 @@ def _ask_key(name: str) -> str:
     return value
 
 
+# getpass 的提示只有「坐在 notebook 前面的人」看得到。
+# 網頁服務跳這個提示，等於讓那個 HTTP 請求一直卡著等一個
+# 沒有人看得到的輸入框 —— 所以服務啟動時會把它關掉。
+_INTERACTIVE = True
+
+
+def set_interactive(on: bool) -> None:
+    """開關「找不到金鑰時當場詢問」。server/cinema/apps.py 會關掉它。"""
+    global _INTERACTIVE
+    _INTERACTIVE = bool(on)
+
+
 def get_key(name: str, required: bool = True) -> str:
     """取得金鑰。順序：環境變數 -> .env -> 當場輸入。"""
     load_env()
     value = os.environ.get(name, "").strip()
     if value:
         return value
-    value = _ask_key(name)
+    if _INTERACTIVE:
+        value = _ask_key(name)
     if not value and required:
         raise RuntimeError(
             f"缺少 {name}。兩種解法擇一：\n"
@@ -93,6 +111,66 @@ def tmdb_token(required: bool = True) -> str:
 
 def gemini_key(required: bool = True) -> str:
     return get_key(GEMINI_KEY_NAME, required=required)
+
+
+# --------------------------------------------------------------------------
+# 讓使用者換成自己的金鑰
+# --------------------------------------------------------------------------
+def has_key(name: str) -> bool:
+    """這把金鑰現在有沒有值？不會跳出任何提示，純粹查詢。"""
+    load_env()
+    return bool(os.environ.get(name, "").strip())
+
+
+def key_status() -> dict:
+    """哪幾把金鑰已經設定好了。
+
+    **只回布林值。** 金鑰本身絕不往外送 —— 網頁前端只需要知道
+    「有沒有設定」，不需要也不應該拿到值。
+    """
+    return {"tmdb": has_key(TMDB_KEY_NAME), "gemini": has_key(GEMINI_KEY_NAME)}
+
+
+_ENV_HEADER = [
+    "# 這個檔案放金鑰，內容不會顯示在 notebook 的輸出裡。",
+    "#",
+    "# 可以直接編輯，也可以在網頁右上角的「API 金鑰」按鈕裡填 ——",
+    "# 兩條路寫的是同一個檔案。",
+    "",
+]
+
+
+def save_keys(**values) -> Path:
+    """把金鑰寫回 .env，並立刻在目前這個行程生效。
+
+    只換掉指定的那幾行，其他內容原封不動 —— 直接整份蓋掉的話，
+    檔案裡的說明註解會在學員存第一次金鑰時就消失。
+
+    值給空字串代表清掉那一把。回傳寫入的檔案路徑。
+    """
+    target = env_path()
+    if target.exists():
+        lines = target.read_text(encoding="utf-8").splitlines()
+    else:
+        # 檔案不存在時順手補上抬頭，不然學員存完金鑰打開來會是光禿禿兩行
+        lines = list(_ENV_HEADER)
+
+    for name, value in values.items():
+        value = str(value or "").strip()
+        for index, raw in enumerate(lines):
+            line = raw.strip()
+            if line.startswith("#") or "=" not in line:
+                continue
+            if line.partition("=")[0].strip() == name:
+                lines[index] = f"{name}={value}"
+                break
+        else:
+            lines.append(f"{name}={value}")
+        # 同時更新環境變數，這樣不必重啟服務就生效
+        os.environ[name] = value
+
+    target.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return target
 
 
 # --------------------------------------------------------------------------

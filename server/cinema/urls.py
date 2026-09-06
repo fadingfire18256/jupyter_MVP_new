@@ -14,5 +14,6 @@ urlpatterns = [
     path("tmdb/search/", views.tmdb_search, name="tmdb-search"),
     path("tmdb/genres/", views.tmdb_genres, name="tmdb-genres"),
     path("chat/", views.chat, name="chat"),
+    path("keys/", views.keys, name="keys"),
     path("time/", views.server_time, name="server-time"),
 ]

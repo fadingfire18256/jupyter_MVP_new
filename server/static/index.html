@@ -882,6 +882,129 @@ body {
   background: #f4f5f7;
   color: #2d3748;
 }
+
+/* --------------------------------------------------------------------------
+ * 金鑰設定（原本的 build 產物沒有這一段）
+ *
+ * 視窗本體重用上面的 .modal-* 樣式，這裡只補按鈕和表單欄位。
+ * -------------------------------------------------------------------------- */
+.key-btn {
+  /* 高度對齊旁邊的搜尋框。按鈕的預設行高比 input 高幾個 px，
+     不釘住的話整張篩選卡會變高，底下的東西全部往下移。 */
+  height: 37px;
+  padding: 0 14px;
+  font-size: .9rem;
+  border: 1px solid #cbd5e0;
+  border-radius: 8px;
+  background: #f7fafc;
+  color: #4a5568;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .15s ease;
+}
+.key-btn:hover {
+  border-color: #805ad5;
+  color: #805ad5;
+}
+.key-btn.missing {
+  border-color: #e53e3e;
+  background: #fff5f5;
+  color: #e53e3e;
+  font-weight: 600;
+}
+.key-intro {
+  font-size: .88rem;
+  color: #4a5568;
+  line-height: 1.7;
+  margin-bottom: 16px;
+}
+.key-field {
+  display: block;
+  margin-bottom: 16px;
+}
+.key-field-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.key-label {
+  font-size: .9rem;
+  font-weight: 600;
+  color: #2d3748;
+}
+.key-state {
+  font-size: .75rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.key-state.on {
+  color: #38a169;
+  background: #f0fff4;
+  border: 1px solid #9ae6b4;
+}
+.key-state.off {
+  color: #e53e3e;
+  background: #fff5f5;
+  border: 1px solid #feb2b2;
+}
+.key-link {
+  margin-left: auto;
+  font-size: .8rem;
+  color: #3182ce;
+  text-decoration: none;
+}
+.key-link:hover {
+  text-decoration: underline;
+}
+.key-input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid #cbd5e0;
+  border-radius: 8px;
+  font-size: .9rem;
+  outline: none;
+  transition: border-color .15s ease;
+}
+.key-input:focus {
+  border-color: #3182ce;
+}
+.key-note {
+  font-size: .78rem;
+  color: #a0aec0;
+  margin-top: 5px;
+}
+.key-message {
+  font-size: .85rem;
+  margin-right: auto;
+  align-self: center;
+}
+.key-message.ok {
+  color: #38a169;
+}
+.key-message.error {
+  color: #e53e3e;
+}
+.key-save {
+  padding: 9px 18px;
+  border: none;
+  border-radius: 8px;
+  background: #3182ce;
+  color: #fff;
+  font-size: .9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+.key-save:hover:not(:disabled) {
+  background: #2b6cb0;
+}
+.key-save:disabled {
+  background: #a0aec0;
+  cursor: not-allowed;
+}
 </style>
 </head>
 <body>
@@ -903,6 +1026,7 @@ body {
         <div class="category-filter-header">
           <span class="category-filter-title">分類篩選</span>
           <input type="text" class="movie-search" id="movie-search" placeholder="搜尋片名…">
+          <button type="button" class="key-btn" id="key-open">API 金鑰</button>
         </div>
         <div class="category-buttons" id="category-buttons"></div>
         <!-- 下面兩個容器平常是空的（空 div 不佔高度也沒有邊框），
@@ -940,6 +1064,9 @@ body {
   <!-- 詳細資料視窗。overlay 是 position:fixed，所以放在 .page 外面
        完全不影響版面，也不會多出一個 flex 項目 -->
   <div id="modal-host"></div>
+
+  <!-- 金鑰設定視窗自己一個容器，才不會和電影詳細資料互相蓋掉 -->
+  <div id="key-modal-host"></div>
 
 </div>
 <script>
@@ -1012,6 +1139,9 @@ const state = {
   recent: [],
   selected: null,
   chat: { messages: [], sending: false, sessionId: newSessionId() },
+  // null = 還沒問過後端，true/false = 已知
+  keyStatus: { tmdb: null, gemini: null },
+  keyMissing: { tmdb: false, gemini: false },
 };
 
 for (const cinema of CINEMAS) {
@@ -1155,6 +1285,7 @@ async function enrichTitles(cinema, store) {
 
   async function worker() {
     while (cursor < titles.length) {
+      if (state.keyMissing.tmdb) return;
       const index = cursor++;
       const title = titles[index];
       try {
@@ -1165,6 +1296,10 @@ async function enrichTitles(cinema, store) {
           // 只取第一筆 —— 後端已經把最像的那部排到最前面了（第 02 章的陷阱）
           const meta = (data.results || [])[0] || null;
           if (meta) slots[index] = { title, meta, source: cinema.key };
+        } else if (noteMissingKey(data)) {
+          // 金鑰沒設定的話，剩下六十幾次查詢也只會拿到同一個 401
+          store.tmdbError = "尚未設定 TMDB 金鑰";
+          return;
         } else if (!store.tmdbError) {
           store.tmdbError = data.error || "TMDB 查詢失敗";
         }
@@ -1188,6 +1323,7 @@ async function loadGenres() {
     const response = await fetch(`${API}/tmdb/genres/?language=zh-TW`);
     const data = await response.json();
     if (!response.ok) {
+      noteMissingKey(data);
       state.genreError = data.error || "類型載入失敗";
     } else {
       const names = {};
@@ -1397,6 +1533,7 @@ async function sendChat(text) {
       }),
     });
     const data = await response.json();
+    noteMissingKey(data);
     state.chat.messages = [...state.chat.messages, {
       role: "assistant",
       content: data.reply || data.error || "（無回應）",
@@ -1453,6 +1590,7 @@ function render() {
   renderMovieArea(visible);
   renderChat(visible);
   renderModal();
+  renderKeyButton();
 }
 
 
@@ -1901,6 +2039,180 @@ function tick(value) {
 
 
 /* --------------------------------------------------------------------------
+ * 金鑰設定
+ *
+ * 教材附了一組共用金鑰，但共用金鑰的額度是大家一起分的 ——
+ * 全班同時發問就會有人收到 429。這個視窗讓你換成自己申請的，
+ * 存下去會寫進專案根目錄的 .env，伺服器立刻改用新的，不必重啟。
+ *
+ * 注意這裡從頭到尾沒有把金鑰讀回來過：/api/keys/ 只回「有沒有設定」。
+ * 金鑰進得去、出不來，這是處理金鑰時該有的預設姿勢。
+ * -------------------------------------------------------------------------- */
+const KEY_FIELDS = [
+  {
+    id: "tmdb",
+    label: "TMDB Read Access Token",
+    apply: "https://www.themoviedb.org/settings/api",
+    note: "在 TMDB 的 API 設定頁選 API 讀取存取權杖（Read Access Token），不是 API Key。",
+  },
+  {
+    id: "gemini",
+    label: "Gemini API Key",
+    apply: "https://aistudio.google.com/apikey",
+    note: "Google AI Studio 的 Create API key，免費額度是按金鑰計算的。",
+  },
+];
+
+/** 後端回 401 時會告訴我們是哪一把不見了。 */
+function noteMissingKey(data) {
+  if (!data || !data.need_key) return false;
+  state.keyMissing[data.need_key] = true;
+  state.keyStatus[data.need_key] = false;
+  return true;
+}
+
+async function loadKeyStatus() {
+  try {
+    const response = await fetch(`${API}/keys/`);
+    const data = await response.json();
+    if (response.ok && data.keys) {
+      state.keyStatus = data.keys;
+      for (const field of KEY_FIELDS) {
+        if (data.keys[field.id]) state.keyMissing[field.id] = false;
+      }
+    }
+  } catch {
+    /* 查不到就維持未知，按鈕照樣能點開 */
+  }
+  render();
+}
+
+function renderKeyButton() {
+  const missing = KEY_FIELDS.filter((f) => state.keyStatus[f.id] === false);
+  if (!changed("keyButton", missing.map((f) => f.id).join(","))) return;
+  const button = $("key-open");
+  button.className = missing.length ? "key-btn missing" : "key-btn";
+  button.textContent = missing.length ? "⚠ 設定 API 金鑰" : "API 金鑰";
+}
+
+function openKeyDialog(message) {
+  const host = $("key-modal-host");
+
+  const fields = KEY_FIELDS.map((field) => {
+    const on = state.keyStatus[field.id];
+    return el("label", { class: "key-field" },
+      el("div", { class: "key-field-head" },
+        el("span", { class: "key-label", text: field.label }),
+        el("span", {
+          class: `key-state ${on ? "on" : "off"}`,
+          text: on ? "已設定" : "未設定",
+        }),
+        el("a", {
+          class: "key-link", href: field.apply,
+          target: "_blank", rel: "noopener noreferrer",
+          text: "去申請 →",
+        })),
+      el("input", {
+        type: "password", class: "key-input", id: `key-input-${field.id}`,
+        placeholder: on ? "留空表示沿用現在這一把" : "貼上你申請的金鑰",
+        autocomplete: "off",
+      }),
+      el("div", { class: "key-note", text: field.note }));
+  });
+
+  const close = () => setChildren(host);
+
+  setChildren(host, el("div", { class: "modal-overlay", onClick: close },
+    el("div", { class: "modal-card", onClick: (event) => event.stopPropagation() },
+      el("button", {
+        type: "button", class: "modal-close", "aria-label": "關閉", text: "×", onClick: close,
+      }),
+      el("div", { class: "modal-section" },
+        el("h3", { class: "modal-section-title", text: "API 金鑰設定" }),
+        el("p", { class: "key-intro" },
+          "教材附了一組課程共用的金鑰，可以直接上課。",
+          el("br"),
+          "但共用金鑰的額度是全班一起分的，換成自己申請的比較穩。",
+          el("br"),
+          "存下去會寫進專案根目錄的 .env，伺服器馬上改用新的，不用重啟。"),
+        fields,
+        el("div", { class: "modal-footer" },
+          el("span", {
+            class: `key-message${message ? " error" : ""}`,
+            id: "key-message",
+            text: message || "",
+          }),
+          el("button", {
+            type: "button", class: "key-save", id: "key-save",
+            text: "儲存並重新載入", onClick: submitKeys,
+          }))))));
+
+  const first = KEY_FIELDS.find((f) => state.keyStatus[f.id] === false) || KEY_FIELDS[0];
+  $(`key-input-${first.id}`).focus();
+}
+
+async function submitKeys() {
+  const payload = {};
+  for (const field of KEY_FIELDS) {
+    const value = $(`key-input-${field.id}`).value.trim();
+    if (value) payload[field.id] = value;
+  }
+
+  const message = $("key-message");
+  if (Object.keys(payload).length === 0) {
+    message.className = "key-message error";
+    message.textContent = "兩欄都是空的，沒有東西可以存。";
+    return;
+  }
+
+  const button = $("key-save");
+  button.disabled = true;
+  message.className = "key-message";
+  message.textContent = "儲存中…";
+
+  try {
+    const response = await fetch(`${API}/keys/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      message.className = "key-message error";
+      message.textContent = data.error || "儲存失敗";
+      button.disabled = false;
+      return;
+    }
+    state.keyStatus = data.keys;
+    state.keyMissing = { tmdb: false, gemini: false };
+    setChildren($("key-modal-host"));
+    reloadEverything();
+  } catch {
+    message.className = "key-message error";
+    message.textContent = "無法連線到後端伺服器";
+    button.disabled = false;
+  }
+}
+
+/** 換過金鑰之後，把資料整個重抓一次。 */
+function reloadEverything() {
+  for (const cinema of CINEMAS) {
+    state.cinemas[cinema.key] = {
+      titles: [], movies: [], loading: true, error: "", enriching: false, tmdbError: "",
+    };
+  }
+  state.genres = {};
+  state.genreError = "";
+  state.selected = null;
+  movieNodes.clear();
+  render();
+
+  loadGenres();
+  for (const cinema of CINEMAS) loadCinema(cinema);
+}
+
+
+/* --------------------------------------------------------------------------
  * 啟動
  * -------------------------------------------------------------------------- */
 $("movie-search").addEventListener("input", (event) => {
@@ -1915,11 +2227,16 @@ $("chat-input").addEventListener("keydown", (event) => {
   if (event.key === "Enter") sendChat($("chat-input").value);
 });
 
+$("key-open").addEventListener("click", () => openKeyDialog());
+
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && state.selected) closeModal();
 });
 
 render();
+
+// 先問後端金鑰齊不齊，缺的話按鈕會變成紅色的提醒
+loadKeyStatus();
 
 // 類型對照表和兩家影城同時開始抓，彼此不用等
 loadGenres();
