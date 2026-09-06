@@ -122,7 +122,7 @@ notebook cell 裡的程式碼**沒辦法被其他 notebook 或網頁服務使用
 
 ## 講師備註
 
-- `build_modules.py` 直接從 notebook 生出**全部 19 個檔案**（不需要 Jupyter），
+- `build_modules.py` 直接從 notebook 生出**全部 20 個檔案**（不需要 Jupyter），
   用來快速確認教材改動後還跑不跑得動，或第一堂課先展示完成品。
 - 打包給學員前記得清掉 notebook 的執行結果：
   `jupyter nbconvert --ClearOutputPreprocessor.enabled=True --inplace notebooks/*.ipynb`
