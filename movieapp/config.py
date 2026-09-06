@@ -266,7 +266,6 @@ def doctor() -> bool:
     for pkg, label in [
         ("requests", "requests 套件"),
         ("django", "Django 套件"),
-        ("corsheaders", "django-cors-headers"),
         ("pandas", "pandas 套件"),
     ]:
         rows.append((_has_module(pkg), label,

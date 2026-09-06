@@ -12,4 +12,3 @@ pandas>=2.0
 
 # 05_接成服務.ipynb 才會用到
 Django>=4.2,<5.1
-django-cors-headers>=4.3
