@@ -1,0 +1,15 @@
+# 課程用套件。第一次安裝在命令列執行（連同 Jupyter 一起）：
+#   python -m pip install jupyter -r requirements.txt
+#
+# 已經在 notebook 裡的話用 %pip，不要用 !pip ——
+# %pip 會裝到目前 kernel 的環境，!pip 是丟給系統 shell，
+# 用 Anaconda 時兩者會裝到不同地方，然後 import 失敗且看不出原因。
+#
+# 本檔案由 notebooks/00_環境設定.ipynb 的 %%writefile 產生。
+
+requests>=2.31
+pandas>=2.0
+
+# 05_接成服務.ipynb 才會用到
+Django>=4.2,<5.1
+django-cors-headers>=4.3

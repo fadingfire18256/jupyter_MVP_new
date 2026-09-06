@@ -1,0 +1,1929 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>電影推薦系統</title>
+<style>
+/* --------------------------------------------------------------------------
+ * 版面與配色。
+ *
+ * 這段樣式和原本用 Vite build 出來的前端逐條相同 —— 同樣的選擇器、
+ * 同樣的數值，只是從壓縮過的一行還原成看得懂的形式。
+ * 換句話說：畫面長什麼樣沒有變，變的只有「誰把它畫出來」。
+ *
+ * 最後兩條（* 和 body）是全域重置。它放在最後而不是最前面，
+ * 是照著原本 build 產物的順序 —— * 的優先權是 0，
+ * 永遠贏不過上面那些 class 選擇器，所以放前放後結果一樣。
+ * -------------------------------------------------------------------------- */
+.page {
+  max-width: none;
+  margin: 0 auto;
+  padding: 24px 16px;
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+.page-left {
+  width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-self: flex-start;
+  position: sticky;
+  top: 24px;
+  max-height: calc(100vh - 48px);
+}
+.page-left .watchlist-block, .page-left .recent-block {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: calc((100vh - 64px)/2);
+}
+.page-main {
+  flex: 1;
+  min-width: 0;
+}
+.page-title {
+  text-align: center;
+  font-size: 2rem;
+  margin-bottom: 24px;
+  color: #1a202c;
+}
+.category-filter {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px #00000014;
+  position: sticky;
+  top: 12px;
+  z-index: 30;
+}
+.category-filter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.category-filter-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1a202c;
+}
+.category-filter-hint {
+  font-size: .85rem;
+  color: #718096;
+}
+.category-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.category-btn {
+  padding: 7px 14px;
+  font-size: .9rem;
+  border: 1px solid #cbd5e0;
+  border-radius: 8px;
+  background: #f7fafc;
+  color: #4a5568;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.category-btn:hover {
+  border-color: #805ad5;
+  color: #805ad5;
+}
+.category-btn.active {
+  background: #805ad5;
+  border-color: #805ad5;
+  color: #fff;
+  font-weight: 600;
+}
+.mode-badge {
+  margin-left: 6px;
+  font-size: .7rem;
+  background: #ffffff40;
+  border-radius: 4px;
+  padding: 1px 5px;
+  vertical-align: middle;
+}
+.genre-submenu {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #e2e8f0;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.genre-btn {
+  padding: 6px 12px;
+  font-size: .85rem;
+  border: 1px solid #cbd5e0;
+  border-radius: 999px;
+  background: #fff;
+  color: #4a5568;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.genre-btn:hover {
+  border-color: #38a169;
+  color: #38a169;
+}
+.genre-btn.active {
+  background: #38a169;
+  border-color: #38a169;
+  color: #fff;
+  font-weight: 600;
+}
+.slider-bar {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #e2e8f0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.slider-label {
+  font-size: .9rem;
+  color: #4a5568;
+  min-width: 220px;
+}
+.rank-tag {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #805ad5;
+  color: #fff;
+  font-size: .78rem;
+  font-weight: 600;
+}
+.slider-bar input[type=range] {
+  flex: 1;
+  min-width: 200px;
+  accent-color: #805ad5;
+}
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 220px;
+}
+.slider-row input[type=range] {
+  flex: 1;
+  min-width: 160px;
+}
+.slider-bound {
+  font-size: .78rem;
+  color: #a0aec0;
+  white-space: nowrap;
+}
+.slider-reset {
+  padding: 6px 14px;
+  font-size: .85rem;
+  border: 1px solid #cbd5e0;
+  border-radius: 8px;
+  background: #fff;
+  color: #4a5568;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.slider-reset:hover {
+  border-color: #e53e3e;
+  color: #e53e3e;
+}
+.cinema-section {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 29px;
+  box-shadow: 0 1px 3px #00000014;
+}
+.section-title {
+  font-size: 1.8rem;
+  color: #1a202c;
+  margin-bottom: 24px;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 14px;
+}
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 14px;
+}
+.section-header .section-title {
+  margin-bottom: 0;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.movie-search {
+  width: 260px;
+  margin-left: auto;
+  padding: 9px 14px;
+  border: 1px solid #cbd5e0;
+  border-radius: 8px;
+  font-size: .95rem;
+  outline: none;
+  transition: border-color .15s ease;
+}
+.movie-search:focus {
+  border-color: #3182ce;
+}
+.cinema-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit,minmax(360px,1fr));
+  gap: 24px;
+}
+.cinema-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.booking-btn {
+  padding: 7px 14px;
+  font-size: .85rem;
+  font-weight: 600;
+  border-radius: 8px;
+  background: #ed8936;
+  color: #fff;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background .15s ease;
+}
+.booking-btn:hover {
+  background: #dd6b20;
+}
+.booking-btn.disabled {
+  background: #cbd5e0;
+  color: #fff;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.cinema-block {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  background: #fafbfc;
+}
+.cinema-showtimes {
+  border-top: 4px solid #e53e3e;
+}
+.cinema-miramar {
+  border-top: 4px solid #3182ce;
+}
+.cinema-title {
+  font-size: 1.2rem;
+  color: #1a202c;
+}
+.status {
+  color: #718096;
+  font-size: .95rem;
+}
+.status.error {
+  color: #e53e3e;
+}
+.movie-list {
+  list-style: none;
+  max-height: 480px;
+  overflow-y: auto;
+}
+.movie-item {
+  padding: 10px;
+  border-bottom: 1px dashed #e2e8f0;
+  cursor: pointer;
+  transition: background .15s ease;
+  border-radius: 6px;
+}
+.movie-item:hover {
+  background: #edf2f7;
+}
+.movie-item:last-child {
+  border-bottom: none;
+}
+.movie-title {
+  font-weight: 600;
+  font-size: .95rem;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.movie-sources {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.source-tag {
+  font-size: .82rem;
+  font-weight: 600;
+  color: #3182ce;
+  background: #ebf8ff;
+  border: 1px solid #bee3f8;
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+.movie-meta {
+  display: flex;
+  gap: 10px;
+}
+.movie-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+.watchlist-add-btn {
+  padding: 6px 12px;
+  font-size: .8rem;
+  font-weight: 600;
+  border: 1px solid #38a169;
+  border-radius: 8px;
+  background: #f0fff4;
+  color: #38a169;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.watchlist-add-btn:hover:not(:disabled) {
+  background: #38a169;
+  color: #fff;
+}
+.watchlist-add-btn.added {
+  background: #e2e8f0;
+  border-color: #a0aec0;
+  color: #718096;
+  cursor: not-allowed;
+}
+.movie-poster {
+  width: 66px;
+  height: 98px;
+  object-fit: cover;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+.movie-info {
+  font-size: .85rem;
+  color: #4a5568;
+  line-height: 1.5;
+}
+.movie-field .field-label {
+  color: #a0aec0;
+  margin-right: 4px;
+}
+.movie-no-meta {
+  font-size: .8rem;
+  color: #a0aec0;
+}
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: #1a202c99;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 100;
+}
+.modal-card {
+  position: relative;
+  background: #fff;
+  border-radius: 14px;
+  max-width: 640px;
+  width: 100%;
+  max-height: 88vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 50px #00000059;
+}
+.modal-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: #00000073;
+  color: #fff;
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 10;
+  transition: background .15s ease;
+}
+.modal-close:hover {
+  background: #000000b3;
+}
+.modal-hero {
+  position: relative;
+  background: #1a202c;
+}
+.modal-backdrop {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  opacity: .45;
+  display: block;
+}
+.modal-hero-content {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  padding: 16px 20px;
+  background: linear-gradient(to top,rgba(26,32,44,.9),transparent 70%);
+}
+.modal-poster {
+  width: 96px;
+  height: 144px;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px #00000080;
+  flex-shrink: 0;
+}
+.modal-poster.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #4a5568;
+  color: #a0aec0;
+  font-size: .85rem;
+}
+.modal-hero-text {
+  color: #fff;
+  min-width: 0;
+}
+.modal-title {
+  font-size: 1.5rem;
+  margin-bottom: 4px;
+}
+.modal-subtitle {
+  font-size: .9rem;
+  color: #cbd5e0;
+  margin-bottom: 8px;
+}
+.modal-rating {
+  font-size: 1.1rem;
+}
+.rating-star {
+  color: #f6ad55;
+}
+.rating-count {
+  font-size: .85rem;
+  color: #cbd5e0;
+  margin-left: 6px;
+}
+.modal-section {
+  padding: 18px 22px;
+  border-top: 1px solid #e2e8f0;
+}
+.modal-section-title {
+  font-size: 1rem;
+  color: #2d3748;
+  margin-bottom: 10px;
+}
+.modal-overview {
+  font-size: .95rem;
+  color: #4a5568;
+  line-height: 1.7;
+}
+.modal-fields {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .92rem;
+}
+.modal-fields tr {
+  border-bottom: 1px solid #edf2f7;
+}
+.modal-fields tr:last-child {
+  border-bottom: none;
+}
+.modal-field-label {
+  width: 45%;
+  padding: 7px 10px;
+  color: #718096;
+  font-size: .85rem;
+  vertical-align: top;
+}
+.modal-field-value {
+  padding: 7px 10px;
+  color: #2d3748;
+  word-break: break-all;
+}
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+  margin-top: 16px;
+}
+.watchlist-block {
+  width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px #00000014;
+  overflow: hidden;
+}
+.watchlist-list {
+  list-style: none;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.watchlist-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+.watchlist-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #1a202c;
+}
+.watchlist-count {
+  font-size: .8rem;
+  font-weight: 600;
+  color: #38a169;
+  background: #f0fff4;
+  border: 1px solid #9ae6b4;
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.watchlist-empty {
+  padding: 24px 16px;
+  font-size: .85rem;
+  color: #a0aec0;
+  line-height: 1.7;
+  text-align: center;
+}
+.watchlist-list {
+  list-style: none;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.watchlist-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px;
+  background: #fafbfc;
+}
+.watchlist-item-top {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+.watchlist-poster {
+  width: 48px;
+  height: 71px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.watchlist-item-title {
+  font-size: .9rem;
+  font-weight: 600;
+  color: #2d3748;
+  line-height: 1.45;
+}
+.watchlist-remove-btn {
+  display: block;
+  margin-left: auto;
+  padding: 5px 10px;
+  font-size: .75rem;
+  font-weight: 600;
+  border: 1px solid #e53e3e;
+  border-radius: 8px;
+  background: #fff5f5;
+  color: #e53e3e;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.watchlist-remove-btn:hover {
+  background: #e53e3e;
+  color: #fff;
+}
+.recent-block {
+  width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px #00000014;
+  overflow: hidden;
+}
+.recent-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+.recent-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #1a202c;
+}
+.recent-count {
+  font-size: .8rem;
+  font-weight: 600;
+  color: #805ad5;
+  background: #faf5ff;
+  border: 1px solid #d6bcfa;
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.recent-empty {
+  padding: 24px 16px;
+  font-size: .85rem;
+  color: #a0aec0;
+  line-height: 1.7;
+  text-align: center;
+}
+.recent-list {
+  list-style: none;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.recent-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 8px;
+  background: #fafbfc;
+}
+.recent-item-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+.recent-item-main:hover .recent-item-title {
+  color: #3182ce;
+}
+.recent-poster {
+  width: 42px;
+  height: 62px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.recent-item-title {
+  font-size: .88rem;
+  font-weight: 600;
+  color: #2d3748;
+  line-height: 1.4;
+  transition: color .15s ease;
+}
+.recent-add {
+  display: block;
+  margin-left: auto;
+  margin-top: 8px;
+}
+.chat-panel {
+  width: 340px;
+  flex-shrink: 0;
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px #00000014;
+  height: calc(100vh - 48px);
+  position: sticky;
+  top: 24px;
+}
+.chat-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.chat-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #1a202c;
+}
+.chat-hint {
+  font-size: .78rem;
+  color: #a0aec0;
+}
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.chat-placeholder {
+  font-size: .85rem;
+  color: #a0aec0;
+  line-height: 1.6;
+}
+.chat-msg {
+  padding: 9px 12px;
+  border-radius: 10px;
+  font-size: .9rem;
+  line-height: 1.55;
+  max-width: 88%;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.chat-user {
+  align-self: flex-end;
+  background: #3182ce;
+  color: #fff;
+}
+.chat-assistant {
+  align-self: flex-start;
+  background: #edf2f7;
+  color: #2d3748;
+}
+.chat-thinking {
+  color: #a0aec0;
+  font-style: italic;
+}
+.chat-quick-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 16px 0;
+}
+.quick-chip {
+  font-size: .75rem;
+  padding: 5px 10px;
+  border: 1px solid #cbd5e0;
+  border-radius: 999px;
+  background: #f7fafc;
+  color: #4a5568;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.quick-chip:hover:not(:disabled) {
+  border-color: #3182ce;
+  color: #3182ce;
+  background: #ebf8ff;
+}
+.quick-chip:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+.chat-input-row {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid #e2e8f0;
+}
+.chat-input {
+  flex: 1;
+  padding: 9px 12px;
+  border: 1px solid #cbd5e0;
+  border-radius: 8px;
+  font-size: .9rem;
+  outline: none;
+}
+.chat-input:focus {
+  border-color: #3182ce;
+}
+.chat-send {
+  padding: 9px 16px;
+  border: none;
+  border-radius: 8px;
+  background: #3182ce;
+  color: #fff;
+  font-size: .9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+.chat-send:hover:not(:disabled) {
+  background: #2b6cb0;
+}
+.chat-send:disabled {
+  background: #a0aec0;
+  cursor: not-allowed;
+}
+@media (max-width: 900px) {
+  .page {
+    flex-direction: column;
+  }
+  .page-left {
+    width: 100%;
+    position: static;
+    max-height: none;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .page-left .watchlist-block, .page-left .recent-block {
+    flex: 1 1 280px;
+    max-height: 320px;
+  }
+  .chat-panel {
+    width: 100%;
+    height: 420px;
+    position: static;
+  }
+}
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+body {
+  font-family: Segoe UI,Microsoft JhengHei,sans-serif;
+  background: #f4f5f7;
+  color: #2d3748;
+}
+</style>
+</head>
+<body>
+<div id="root">
+
+  <div class="page">
+
+    <!-- 左欄：待看清單 / 最近瀏覽（兩塊的內容都由 JS 填） -->
+    <div class="page-left">
+      <aside class="watchlist-block" id="watchlist-block"></aside>
+      <aside class="recent-block" id="recent-block"></aside>
+    </div>
+
+    <!-- 中欄：標題 / 篩選列 / 電影清單 -->
+    <div class="page-main">
+      <h1 class="page-title">全國電影整合系統</h1>
+
+      <div class="category-filter">
+        <div class="category-filter-header">
+          <span class="category-filter-title">分類篩選</span>
+          <input type="text" class="movie-search" id="movie-search" placeholder="搜尋片名…">
+        </div>
+        <div class="category-buttons" id="category-buttons"></div>
+        <!-- 下面兩個容器平常是空的（空 div 不佔高度也沒有邊框），
+             按下「類型」或某個排序鍵時才會被填進去 -->
+        <div id="genre-host"></div>
+        <div id="slider-host"></div>
+      </div>
+
+      <section class="cinema-section">
+        <div class="section-header">
+          <h2 class="section-title">電影</h2>
+        </div>
+        <div id="movie-area">
+          <ul class="movie-list" id="movie-list"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- 右欄：AI 聊天 -->
+    <aside class="chat-panel">
+      <div class="chat-header">
+        <span class="chat-title">電影推薦助手</span>
+        <span class="chat-hint" id="chat-hint">（等待電影資料…）</span>
+      </div>
+      <div class="chat-messages" id="chat-messages"></div>
+      <div class="chat-quick-prompts" id="chat-quick"></div>
+      <div class="chat-input-row">
+        <input type="text" class="chat-input" id="chat-input" placeholder="輸入訊息…">
+        <button type="button" class="chat-send" id="chat-send">送出</button>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- 詳細資料視窗。overlay 是 position:fixed，所以放在 .page 外面
+       完全不影響版面，也不會多出一個 flex 項目 -->
+  <div id="modal-host"></div>
+
+</div>
+<script>
+/* --------------------------------------------------------------------------
+ * 前端。這支檔案不重複實作任何後端邏輯：
+ * 抓片單、查 TMDB、挑最佳比對結果全都在 movieapp/ 裡，
+ * 這裡只負責「跟 /api/ 要資料、畫出來、把問題轉給 /api/chat/」。
+ *
+ * 篩選、排序、去重放在瀏覽器做，因為那要即時反應 ——
+ * 每按一次按鈕就往伺服器跑一趟太慢，而且那些資料早就在手上了。
+ * -------------------------------------------------------------------------- */
+
+const API = "/api";
+const IMG_SMALL = "https://image.tmdb.org/t/p/w92";
+const IMG_MEDIUM = "https://image.tmdb.org/t/p/w300";
+const IMG_ORIGINAL = "https://image.tmdb.org/t/p/original";
+
+// 兩家影城：key 同時是 /api/<key>/ 的路徑、來源代號、訂票連結的識別
+const CINEMAS = [
+  { key: "showtimes", label: "秀泰影城", url: "https://www.showtimes.com.tw/" },
+  { key: "miramar", label: "美麗華影城", url: "https://www.miramarcinemas.tw/" },
+];
+
+// 篩選列上的五顆按鈕
+const FILTER_BUTTONS = [
+  { key: "adult", label: "是否成人片", type: "bool" },
+  { key: "genre_ids", label: "類型", type: "genre" },
+  { key: "popularity", label: "熱門度", type: "slider" },
+  { key: "releaseDate", label: "上映日期", type: "slider" },
+  { key: "voteAverage", label: "評分", type: "slider" },
+];
+
+const SORT_KEYS = ["popularity", "releaseDate", "voteAverage"];
+
+const QUICK_PROMPTS = [
+  "推薦一部高分電影",
+  "推薦黑暗風格的電影",
+  "推薦喜劇片",
+  "哪部電影評分最高？",
+  "推薦今天上映的電影",
+  "推薦動作片",
+];
+
+// 同時發出幾個 TMDB 查詢。
+//
+// 一部一部排隊查，六十幾部片乘上每次約半秒的來回，要等三十秒以上；
+// 全部一次射出去又會撞到 TMDB 的速率限制（429）。
+// 開一個固定大小的池子，維持八個請求在路上，是這兩者之間的折衷。
+const TMDB_CONCURRENCY = 8;
+
+
+/* --------------------------------------------------------------------------
+ * 狀態
+ * -------------------------------------------------------------------------- */
+const state = {
+  // 每家影城各自一份：片名、補完 TMDB 的電影、載入中、錯誤
+  cinemas: {},
+  genres: {},
+  genreError: "",
+  filters: {
+    adult: "off",
+    genreId: null,
+    popularity: { mode: "off", threshold: null },
+    releaseDate: { mode: "off", threshold: null },
+    voteAverage: { mode: "off", threshold: null },
+  },
+  genrePanelOpen: false,
+  search: "",
+  watchlist: loadWatchlist(),
+  recent: [],
+  selected: null,
+  chat: { messages: [], sending: false, sessionId: newSessionId() },
+};
+
+for (const cinema of CINEMAS) {
+  state.cinemas[cinema.key] = {
+    titles: [], movies: [], loading: true, error: "", enriching: false, tmdbError: "",
+  };
+}
+
+function loadWatchlist() {
+  try {
+    return JSON.parse(localStorage.getItem("watchlist") || "[]") || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveWatchlist() {
+  try {
+    localStorage.setItem("watchlist", JSON.stringify(state.watchlist));
+  } catch {
+    /* 無痕視窗或關掉儲存空間時會丟例外，不影響其他功能 */
+  }
+}
+
+function newSessionId() {
+  return (typeof crypto !== "undefined" && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : String(Math.random()).slice(2);
+}
+
+
+/* --------------------------------------------------------------------------
+ * 小工具
+ * -------------------------------------------------------------------------- */
+const $ = (id) => document.getElementById(id);
+
+/** 建立元素。attrs 裡的 class/text 是捷徑，on* 會掛成事件。 */
+function el(tag, attrs, ...children) {
+  const node = document.createElement(tag);
+  let text = null;
+  for (const [key, value] of Object.entries(attrs || {})) {
+    if (value == null || value === false) continue;
+    if (key === "class") node.className = value;
+    else if (key === "text") text = value;
+    else if (key.startsWith("on")) node.addEventListener(key.slice(2).toLowerCase(), value);
+    else node.setAttribute(key, value === true ? "" : String(value));
+  }
+  setChildren(node, text, ...children);
+  return node;
+}
+
+/** 把 children 換掉。跟 el() 一樣會攤平陣列、略過 null/false，
+ *  所以 `條件 && el(...)` 這種寫法在這裡也安全。
+ *  （原生的 replaceChildren 不會過濾，會把 false 直接印成 "false"。） */
+function setChildren(node, ...children) {
+  node.replaceChildren();
+  for (const child of children.flat(Infinity)) {
+    if (child == null || child === false || child === "") continue;
+    node.appendChild(child instanceof Node ? child : document.createTextNode(String(child)));
+  }
+}
+
+/** 一部電影的唯一身分：有 TMDB id 就用 id，沒有就退回片名。
+ *  和後端 merge.movie_key() 是同一個想法。 */
+function movieId(movie) {
+  const id = movie.meta && movie.meta.id;
+  return id != null ? id : movie.title;
+}
+
+function sameMovie(a, b) {
+  return movieId(a) === movieId(b);
+}
+
+function inWatchlist(movie) {
+  return state.watchlist.some((item) => sameMovie(item, movie));
+}
+
+/** "2026-08-07" -> 可以直接比大小的月份序號。和後端 merge._release_month() 一致。 */
+function releaseMonth(value) {
+  if (!value) return null;
+  const match = /^(\d{4})-(\d{1,2})/.exec(String(value).trim());
+  return match ? Number(match[1]) * 12 + Number(match[2]) : null;
+}
+
+/** 月份序號 -> "2026年8月" */
+function monthLabel(value) {
+  if (value == null) return "";
+  return `${Math.floor((value - 1) / 12)}年${((value - 1) % 12) + 1}月`;
+}
+
+function modeLabel(mode) {
+  return mode === "desc" ? "高→低" : "低→高";
+}
+
+function genreNames(ids) {
+  return (ids || []).map((id) => state.genres[id] || id).join("、");
+}
+
+
+/* --------------------------------------------------------------------------
+ * 抓資料
+ *
+ * 流程和第 01~02 章一模一樣，只是換到瀏覽器這一側跑：
+ *     /api/<影城>/          -> 一串片名
+ *     /api/tmdb/search/     -> 每個片名補上 TMDB 資料
+ *
+ * 為什麼不做成一支「一次回傳全部」的 API？因為那樣畫面會整整空白十幾秒。
+ * 分開之後，片單一到就先畫出來，TMDB 的海報和評分再一批一批補上去。
+ * -------------------------------------------------------------------------- */
+async function loadCinema(cinema) {
+  const store = state.cinemas[cinema.key];
+
+  // 第一步：片名
+  try {
+    const response = await fetch(`${API}/${cinema.key}/`);
+    const data = await response.json();
+    if (response.ok) store.titles = data.movies || [];
+    else store.error = data.error || "載入失敗";
+  } catch {
+    store.error = "無法連線到後端伺服器";
+  }
+  store.loading = false;
+  render();
+
+  if (store.error || store.titles.length === 0) return;
+
+  // 第二步：逐部補 TMDB 資料
+  await enrichTitles(cinema, store);
+}
+
+async function enrichTitles(cinema, store) {
+  const titles = store.titles;
+
+  // 結果先寫進固定位置再過濾，這樣不管誰先回來，
+  // 畫面上的順序永遠跟影城給的片單順序一致。
+  const slots = new Array(titles.length).fill(null);
+  let cursor = 0;
+
+  store.enriching = true;
+  render();
+
+  async function worker() {
+    while (cursor < titles.length) {
+      const index = cursor++;
+      const title = titles[index];
+      try {
+        const url = `${API}/tmdb/search/?query=${encodeURIComponent(title)}&language=zh-TW`;
+        const response = await fetch(url);
+        const data = await response.json();
+        if (response.ok) {
+          // 只取第一筆 —— 後端已經把最像的那部排到最前面了（第 02 章的陷阱）
+          const meta = (data.results || [])[0] || null;
+          if (meta) slots[index] = { title, meta, source: cinema.key };
+        } else if (!store.tmdbError) {
+          store.tmdbError = data.error || "TMDB 查詢失敗";
+        }
+      } catch {
+        if (!store.tmdbError) store.tmdbError = "無法連線到 TMDB";
+      }
+      store.movies = slots.filter(Boolean);
+      scheduleRender();
+    }
+  }
+
+  const size = Math.min(TMDB_CONCURRENCY, titles.length);
+  await Promise.all(Array.from({ length: size }, worker));
+
+  store.enriching = false;
+  render();
+}
+
+async function loadGenres() {
+  try {
+    const response = await fetch(`${API}/tmdb/genres/?language=zh-TW`);
+    const data = await response.json();
+    if (!response.ok) {
+      state.genreError = data.error || "類型載入失敗";
+    } else {
+      const names = {};
+      for (const genre of data.genres || []) names[genre.id] = genre.name;
+      state.genres = names;
+    }
+  } catch {
+    state.genreError = "無法載入類型";
+  }
+  render();
+}
+
+
+/* --------------------------------------------------------------------------
+ * 整合、篩選、排序
+ *
+ * 這一段是第 03 章 merge.py 的瀏覽器版本，規則完全一樣：
+ * 用 TMDB id 當共同身分證跨影城去重，查不到 id 的才退回用片名。
+ * -------------------------------------------------------------------------- */
+function mergedMovies() {
+  const merged = new Map();
+  for (const cinema of CINEMAS) {
+    for (const movie of state.cinemas[cinema.key].movies) {
+      const id = movie.meta && movie.meta.id;
+      const key = id != null ? `tmdb:${id}` : `title:${movie.title}`;
+      const existing = merged.get(key);
+      if (existing) {
+        if (!existing.sources.includes(movie.source)) existing.sources.push(movie.source);
+      } else {
+        merged.set(key, { ...movie, sources: [movie.source] });
+      }
+    }
+  }
+  return Array.from(merged.values());
+}
+
+/** 滑桿的刻度要跟著實際資料走，不能寫死。 */
+function bounds(movies) {
+  const populars = movies.map((m) => (m.meta && m.meta.popularity) || 0);
+  const years = movies
+    .map((m) => Number.parseInt(m.meta && m.meta.release_date, 10))
+    .filter(Boolean);
+  return {
+    popularityMax: Math.max(10, ...populars),
+    yearMin: years.length ? Math.min(...years) : 1990,
+    yearMax: Math.max(new Date().getFullYear(), ...years),
+  };
+}
+
+function applyFilters(movies, filters) {
+  const kept = movies.filter((movie) => {
+    const meta = movie.meta;
+    if (filters.adult === "true" && !(meta && meta.adult)) return false;
+    if (filters.adult === "false" && meta && meta.adult) return false;
+    if (filters.genreId && !((meta && meta.genre_ids) || []).includes(filters.genreId)) return false;
+    if (filters.popularity.threshold != null
+        && ((meta && meta.popularity) ?? 0) < filters.popularity.threshold) return false;
+    if (filters.voteAverage.threshold != null
+        && ((meta && meta.vote_average) ?? 0) < filters.voteAverage.threshold) return false;
+    if (filters.releaseDate.threshold != null) {
+      const month = releaseMonth(meta && meta.release_date);
+      if (month == null || month < filters.releaseDate.threshold) return false;
+    }
+    return true;
+  });
+
+  // 三個排序鍵一次只會有一個生效
+  const active = SORT_KEYS.find((key) => filters[key].mode !== "off");
+  if (!active) return kept;
+
+  const field = active === "releaseDate" ? "release_date"
+    : active === "voteAverage" ? "vote_average" : "popularity";
+  const direction = filters[active].mode === "asc" ? 1 : -1;
+
+  return [...kept].sort((a, b) => {
+    const left = a.meta && a.meta[field];
+    const right = b.meta && b.meta[field];
+    // 沒有值的一律沉到最後，不管是升冪還是降冪
+    if (left == null || left === "") return 1;
+    if (right == null || right === "") return -1;
+    return typeof left === "number"
+      ? (left - right) * direction
+      : (Date.parse(left) - Date.parse(right)) * direction;
+  });
+}
+
+function searchMovies(movies, keyword) {
+  const query = keyword.trim().toLowerCase();
+  if (!query) return movies;
+  return movies.filter((movie) =>
+    movie.title.toLowerCase().includes(query)
+    || ((movie.meta && movie.meta.title) || "").toLowerCase().includes(query));
+}
+
+/** 目前畫面上實際看得到的電影 —— 聊天的 prompt 也是拿這一份。 */
+function visibleMovies() {
+  return searchMovies(applyFilters(mergedMovies(), state.filters), state.search);
+}
+
+/** 把畫面上的電影塞進系統提示。
+ *  這是第 04 章 gemini.build_system_prompt() 的同一個想法：
+ *  模型本身不知道今天上映什麼，是我們把資料餵給它的（最陽春的 RAG）。 */
+function buildSystemPrompt(movies) {
+  if (movies.length === 0) return "";
+  const lines = movies.map((movie, index) => {
+    const meta = movie.meta;
+    const parts = [
+      meta && meta.title ? `片名: ${meta.title}` : "",
+      meta && meta.release_date ? `上映日期: ${meta.release_date}` : "",
+      meta && meta.vote_average != null ? `評分: ${meta.vote_average.toFixed(1)}` : "",
+      meta && meta.genre_ids && meta.genre_ids.length ? `類型: ${genreNames(meta.genre_ids)}` : "",
+      meta && meta.overview ? `簡介: ${meta.overview.slice(0, 200)}` : "",
+    ].filter(Boolean);
+    return `${index + 1}. ${movie.title}${parts.length ? `（${parts.join("，")}）` : ""}`;
+  });
+  return "你是電影推薦助手，請用繁體中文回答。以下是目前頁面顯示的電影資料，"
+    + "請依據這些資料回答使用者的問題（例如推薦、比較、說明）：\n"
+    + lines.join("\n");
+}
+
+
+/* --------------------------------------------------------------------------
+ * 操作
+ * -------------------------------------------------------------------------- */
+function cycleAdult() {
+  const order = { off: "true", true: "false", false: "off" };
+  state.filters.adult = order[state.filters.adult];
+  render();
+}
+
+function toggleGenrePanel() {
+  state.genrePanelOpen = !state.genrePanelOpen;
+  if (!state.genrePanelOpen) state.filters.genreId = null;  // 收起來就順手清掉選擇
+  render();
+}
+
+function selectGenre(id) {
+  state.filters.genreId = state.filters.genreId === id ? null : id;
+  render();
+}
+
+/** 排序鍵按一下換一種：不排 -> 高到低 -> 低到高 -> 不排。
+ *  同時把另外兩個鍵關掉，因為一次只排一個欄位。 */
+function cycleSlider(key) {
+  const current = state.filters[key].mode;
+  const next = current === "off" ? "desc" : current === "desc" ? "asc" : "off";
+  for (const other of SORT_KEYS) {
+    state.filters[other] = other === key
+      ? { mode: next, threshold: next === "off" ? null : state.filters[key].threshold }
+      : { mode: "off", threshold: null };
+  }
+  render();
+}
+
+function setThreshold(key, value) {
+  state.filters[key].threshold = value;
+  render();
+}
+
+function resetThreshold(key) {
+  state.filters[key].threshold = null;
+  render();
+}
+
+function addToWatchlist(movie) {
+  if (inWatchlist(movie)) return;
+  state.watchlist = [...state.watchlist, movie];
+  saveWatchlist();
+  render();
+}
+
+function removeFromWatchlist(movie) {
+  state.watchlist = state.watchlist.filter((item) => !sameMovie(item, movie));
+  saveWatchlist();
+  render();
+}
+
+/** 點一部電影：開詳細資料，同時記進「最近瀏覽」（只留最新 10 筆）。 */
+function selectMovie(movie) {
+  state.selected = movie;
+  state.recent = [movie, ...state.recent.filter((item) => !sameMovie(item, movie))].slice(0, 10);
+  render();
+}
+
+function closeModal() {
+  state.selected = null;
+  render();
+}
+
+async function sendChat(text) {
+  const message = (text || "").trim();
+  if (!message || state.chat.sending) return;
+
+  state.chat.messages = [...state.chat.messages, { role: "user", content: message }];
+  state.chat.sending = true;
+  $("chat-input").value = "";
+  render();
+
+  try {
+    const response = await fetch(`${API}/chat/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        system: buildSystemPrompt(visibleMovies()),
+        messages: state.chat.messages,
+        session_id: state.chat.sessionId,
+      }),
+    });
+    const data = await response.json();
+    state.chat.messages = [...state.chat.messages, {
+      role: "assistant",
+      content: data.reply || data.error || "（無回應）",
+    }];
+  } catch {
+    state.chat.messages = [...state.chat.messages, {
+      role: "assistant",
+      content: "無法連線聊天服務",
+    }];
+  }
+  state.chat.sending = false;
+  render();
+}
+
+
+/* --------------------------------------------------------------------------
+ * 畫面
+ *
+ * 沒有框架，所以自己處理「不要重畫沒變的東西」：
+ * 每一區先算一個簽章，跟上次一樣就跳過。
+ * 這不只是省效能 —— 一直重建 <img> 會讓海報閃爍，
+ * 而且重建 <input> 會把游標和拖曳中的滑桿弄掉。
+ * -------------------------------------------------------------------------- */
+const signatures = {};
+
+function changed(name, value) {
+  if (signatures[name] === value) return false;
+  signatures[name] = value;
+  return true;
+}
+
+let renderQueued = false;
+
+/** 補資料時每回來一筆就重畫一次太浪費，合併到下一個畫面更新再處理。 */
+function scheduleRender() {
+  if (renderQueued) return;
+  renderQueued = true;
+  requestAnimationFrame(() => {
+    renderQueued = false;
+    render();
+  });
+}
+
+function render() {
+  const merged = mergedMovies();
+  const visible = searchMovies(applyFilters(merged, state.filters), state.search);
+  const limits = bounds(merged);
+
+  renderWatchlist();
+  renderRecent();
+  renderCategoryButtons();
+  renderGenreSubmenu();
+  renderSliderBar(limits);
+  renderMovieArea(visible);
+  renderChat(visible);
+  renderModal();
+}
+
+
+/* ---------- 左欄：待看清單 ---------- */
+function renderWatchlist() {
+  const list = state.watchlist;
+  if (!changed("watchlist", list.map(movieId).join("|"))) return;
+
+  const host = $("watchlist-block");
+  setChildren(host,
+    el("div", { class: "watchlist-header" },
+      el("span", { class: "watchlist-title", text: "待看電影清單" }),
+      el("span", { class: "watchlist-count", text: list.length })),
+    list.length === 0
+      ? el("div", { class: "watchlist-empty" }, "尚無待看電影", el("br"), "點擊電影的「加入待看清單」按鈕")
+      : el("ul", { class: "watchlist-list" }, list.map((movie) => {
+          const meta = movie.meta;
+          return el("li", { class: "watchlist-item" },
+            el("div", { class: "watchlist-item-top" },
+              meta && meta.poster_path && el("img", {
+                src: IMG_SMALL + meta.poster_path, alt: "",
+                class: "watchlist-poster", loading: "lazy",
+              }),
+              el("div", { class: "watchlist-item-title", text: movie.title })),
+            el("button", {
+              type: "button", class: "watchlist-remove-btn", text: "刪除待看電影",
+              onClick: () => removeFromWatchlist(movie),
+            }));
+        })));
+}
+
+
+/* ---------- 左欄：最近瀏覽 ---------- */
+function renderRecent() {
+  const list = state.recent;
+  const signature = list.map(movieId).join("|") + "#" + state.watchlist.map(movieId).join("|");
+  if (!changed("recent", signature)) return;
+
+  const host = $("recent-block");
+  setChildren(host,
+    el("div", { class: "recent-header" },
+      el("span", { class: "recent-title", text: "最近瀏覽電影" }),
+      el("span", { class: "recent-count" }, list.length, "/10")),
+    list.length === 0
+      ? el("div", { class: "recent-empty", text: "點擊電影後會記錄在此" })
+      : el("ul", { class: "recent-list" }, list.map((movie) => {
+          const meta = movie.meta;
+          const added = inWatchlist(movie);
+          return el("li", { class: "recent-item" },
+            el("button", {
+              type: "button", class: "recent-item-main",
+              onClick: () => selectMovie(movie),
+            },
+              meta && meta.poster_path && el("img", {
+                src: IMG_SMALL + meta.poster_path, alt: "",
+                class: "recent-poster", loading: "lazy",
+              }),
+              el("span", { class: "recent-item-title", text: movie.title })),
+            el("button", {
+              type: "button",
+              class: `watchlist-add-btn recent-add${added ? " added" : ""}`,
+              disabled: added,
+              text: added ? "已加入" : "加入待看",
+              onClick: () => addToWatchlist(movie),
+            }));
+        })));
+}
+
+
+/* ---------- 篩選列：五顆按鈕 ---------- */
+function renderCategoryButtons() {
+  const filters = state.filters;
+  const signature = JSON.stringify(filters) + "#" + state.genrePanelOpen;
+  if (!changed("categoryButtons", signature)) return;
+
+  const adultBadge = filters.adult === "off" ? "" : filters.adult;
+
+  setChildren($("category-buttons"), ...FILTER_BUTTONS.map((button) => {
+    let active;
+    let badge = "";
+
+    if (button.type === "bool") {
+      active = filters.adult !== "off";
+      badge = adultBadge;
+    } else if (button.type === "genre") {
+      active = state.genrePanelOpen;
+    } else {
+      const filter = filters[button.key];
+      active = filter.mode !== "off" || filter.threshold != null;
+      const parts = [];
+      if (filter.mode !== "off") parts.push(modeLabel(filter.mode));
+      if (filter.threshold != null) parts.push(`≥${filter.threshold}`);
+      badge = parts.join(" ");
+    }
+
+    return el("button", {
+      type: "button",
+      class: `category-btn${active ? " active" : ""}`,
+      onClick: () => {
+        if (button.type === "bool") cycleAdult();
+        else if (button.type === "genre") toggleGenrePanel();
+        else cycleSlider(button.key);
+      },
+    }, button.label, badge && el("span", { class: "mode-badge", text: badge }));
+  }));
+}
+
+
+/* ---------- 篩選列：類型子選單 ---------- */
+function renderGenreSubmenu() {
+  const open = state.genrePanelOpen;
+  const signature = `${open}|${state.filters.genreId}|${state.genreError}|${Object.keys(state.genres).length}`;
+  if (!changed("genreSubmenu", signature)) return;
+
+  const host = $("genre-host");
+  if (!open) {
+    setChildren(host);
+    return;
+  }
+
+  setChildren(host,
+    el("div", { class: "genre-submenu" },
+    state.genreError && el("span", { class: "status error", text: state.genreError }),
+    Object.entries(state.genres).map(([id, name]) => el("button", {
+      type: "button",
+      class: `genre-btn${Number(state.filters.genreId) === Number(id) ? " active" : ""}`,
+      text: name,
+      onClick: () => selectGenre(Number(id)),
+    }))));
+}
+
+
+/* ---------- 篩選列：門檻滑桿 ---------- */
+//
+// 滑桿只有在「有排序鍵開著」的時候出現。
+// 拖曳中每移動一格就會觸發重畫，這時候絕對不能重建 <input>，
+// 不然滑鼠會跟拖曳中的滑桿斷開 —— 所以同一個鍵時只更新數值。
+function renderSliderBar(limits) {
+  const key = SORT_KEYS.find((name) => state.filters[name].mode !== "off");
+  const host = $("slider-host");
+
+  if (!key) {
+    if (changed("sliderKey", "")) setChildren(host);
+    return;
+  }
+
+  const spec = sliderSpec(key, limits);
+  const rebuild = changed("sliderKey", key);
+
+  if (rebuild) {
+    setChildren(host,
+    el("div", { class: "slider-bar" },
+      el("label", { class: "slider-label", id: "slider-label" }),
+      el("div", { class: "slider-row" },
+        el("span", { class: "slider-bound", id: "slider-min" }),
+        el("input", {
+          type: "range", id: "slider-input",
+          onInput: (event) => setThreshold(key, Number(event.target.value)),
+        }),
+        el("span", { class: "slider-bound", id: "slider-max" })),
+      el("button", {
+        type: "button", class: "slider-reset", text: "清除門檻",
+        onClick: () => resetThreshold(key),
+      })));
+  }
+
+  const filter = state.filters[key];
+  setChildren($("slider-label"),
+    filter.mode !== "off" && el("span", { class: "rank-tag" }, "ranking ", modeLabel(filter.mode)),
+    spec.label);
+  $("slider-min").textContent = spec.minLabel;
+  $("slider-max").textContent = spec.maxLabel;
+
+  const input = $("slider-input");
+  input.min = spec.min;
+  input.max = spec.max;
+  input.step = spec.step;
+  if (Number(input.value) !== spec.value) input.value = spec.value;
+}
+
+function sliderSpec(key, limits) {
+  const threshold = state.filters[key].threshold;
+
+  if (key === "popularity") {
+    const max = Math.ceil(limits.popularityMax);
+    const value = threshold ?? 0;
+    return {
+      label: ["熱門度 ≥ ", value, "（低於此值忽略）"],
+      min: 0, max, step: 1, value, minLabel: "0", maxLabel: String(max),
+    };
+  }
+
+  if (key === "voteAverage") {
+    const value = threshold ?? 0;
+    return {
+      label: ["評分 ≥ ", value, "（低於此值忽略）"],
+      min: 0, max: 10, step: 0.1, value, minLabel: "0", maxLabel: "10",
+    };
+  }
+
+  // releaseDate：滑桿上跑的是月份序號，顯示的時候才換回「幾年幾月」
+  const min = limits.yearMin * 12 + 1;
+  const max = limits.yearMax * 12 + 12;
+  const value = threshold ?? min;
+  return {
+    label: ["上映日期 ≥ ", monthLabel(value), "（早於此月忽略）"],
+    min, max, step: 1, value,
+    minLabel: monthLabel(min), maxLabel: monthLabel(max),
+  };
+}
+
+
+/* ---------- 中欄：狀態訊息 + 電影清單 ---------- */
+//
+// 清單用「同一部電影就重用同一個 <li>」的方式更新。
+// 補資料的過程中這個函式會被呼叫幾十次，每次都整份重建的話
+// 海報會不停重新載入而閃爍，捲軸位置也會被拉回頂端。
+const movieNodes = new Map();
+
+function renderMovieArea(visible) {
+  const stores = CINEMAS.map((cinema) => state.cinemas[cinema.key]);
+  const loading = stores.some((store) => store.loading);
+  const errors = stores.map((store) => store.error).filter(Boolean);
+  const tmdbErrors = stores.map((store) => store.tmdbError).filter(Boolean);
+  const enriching = stores.some((store) => store.enriching);
+
+  const notices = [];
+  if (loading) {
+    notices.push(["status", "載入中…"]);
+  } else if (errors.length) {
+    notices.push(["status error", errors.join("；")]);
+  } else {
+    // 影城本身沒掛，但 TMDB 可能單獨出事；出事了照樣把拿得到的電影顯示出來
+    if (tmdbErrors.length) notices.push(["status error", tmdbErrors.join("；")]);
+    if (enriching) notices.push(["status", "查詢 TMDB 資料中…"]);
+    if (!enriching && visible.length === 0) notices.push(["status", "目前沒有電影資料"]);
+  }
+
+  if (changed("notices", JSON.stringify(notices))) {
+    const area = $("movie-area");
+    for (const stale of area.querySelectorAll("p.status")) stale.remove();
+    const list = $("movie-list");
+    for (const [className, text] of notices) {
+      area.insertBefore(el("p", { class: className, text }), list);
+    }
+  }
+
+  reconcileMovieList(visible);
+}
+
+function reconcileMovieList(visible) {
+  const list = $("movie-list");
+  const wanted = visible.map(movieNode);
+
+  // 標準的 keyed 比對：把需要的節點依序搬到定位，剩下的刪掉。
+  // insertBefore 對已經在畫面上的節點是「搬移」而不是「重建」。
+  let cursor = list.firstChild;
+  for (const node of wanted) {
+    if (cursor === node) {
+      cursor = cursor.nextSibling;
+      continue;
+    }
+    list.insertBefore(node, cursor);
+  }
+  while (cursor) {
+    const next = cursor.nextSibling;
+    list.removeChild(cursor);
+    cursor = next;
+  }
+}
+
+function movieNode(movie) {
+  const id = movieId(movie);
+  const signature = [
+    movie.title,
+    (movie.sources || []).join(","),
+    inWatchlist(movie),
+    Object.keys(state.genres).length,
+  ].join("|");
+
+  const cached = movieNodes.get(id);
+  if (cached && cached.signature === signature) return cached.node;
+
+  const node = buildMovieItem(movie);
+  movieNodes.set(id, { signature, node });
+  return node;
+}
+
+function buildMovieItem(movie) {
+  const meta = movie.meta;
+  const labels = (movie.sources || []).map((key) => {
+    const cinema = CINEMAS.find((item) => item.key === key);
+    return cinema ? cinema.label : key;
+  });
+  const added = inWatchlist(movie);
+
+  const info = [];
+  if (meta && meta.title && meta.title !== movie.title) {
+    info.push(field("片名:", meta.title));
+  }
+  if (meta) {
+    info.push(field("上映日期:", meta.release_date || "-"));
+    info.push(field("評分:", meta.vote_average ? `★ ${meta.vote_average.toFixed(1)}` : "-"));
+    if (meta.genre_ids && meta.genre_ids.length) info.push(field("類型:", genreNames(meta.genre_ids)));
+    if (meta.original_language) info.push(field("語言:", meta.original_language));
+  }
+
+  return el("li", { class: "movie-item", onClick: () => selectMovie(movie) },
+    el("div", { class: "movie-title" },
+      movie.title,
+      labels.length > 0 && el("span", { class: "movie-sources" },
+        labels.map((label) => el("span", { class: "source-tag", text: label })))),
+    meta && el("div", { class: "movie-meta" },
+      meta.poster_path && el("img", {
+        src: IMG_SMALL + meta.poster_path, alt: "", class: "movie-poster", loading: "lazy",
+      }),
+      el("div", { class: "movie-info" }, info)),
+    el("div", { class: "movie-actions" },
+      el("button", {
+        type: "button",
+        class: `watchlist-add-btn${added ? " added" : ""}`,
+        disabled: added,
+        text: added ? "已加入待看清單" : "加入待看清單",
+        onClick: (event) => {
+          event.stopPropagation();   // 不要順便把詳細資料視窗打開
+          addToWatchlist(movie);
+        },
+      })));
+}
+
+function field(label, value) {
+  return el("div", { class: "movie-field" },
+    el("span", { class: "field-label", text: label }), " ", value);
+}
+
+
+/* ---------- 右欄：聊天 ---------- */
+function renderChat(visible) {
+  const disabled = visible.length === 0;
+  const { messages, sending } = state.chat;
+
+  $("chat-hint").style.display = disabled ? "" : "none";
+
+  if (changed("chatMessages", `${messages.length}|${sending}`)) {
+    setChildren($("chat-messages"),
+      messages.length === 0 && el("div", { class: "chat-placeholder" },
+        "輸入問題，我會根據目前顯示的電影資料回答，例如「推薦評分最高的電影」"),
+      messages.map((message) => el("div", {
+        class: `chat-msg chat-${message.role}`, text: message.content,
+      })),
+      sending && el("div", { class: "chat-msg chat-assistant chat-thinking", text: "思考中…" }));
+    $("chat-messages").scrollTop = $("chat-messages").scrollHeight;
+  }
+
+  if (changed("chatQuick", `${disabled}|${sending}`)) {
+    setChildren($("chat-quick"), ...QUICK_PROMPTS.map((prompt) => el("button", {
+      type: "button", class: "quick-chip", text: prompt,
+      disabled: sending || disabled,
+      onClick: () => sendChat(prompt),
+    })));
+  }
+
+  $("chat-input").disabled = sending;
+  updateSendButton();
+}
+
+function updateSendButton() {
+  $("chat-send").disabled = state.chat.sending || !$("chat-input").value.trim();
+}
+
+
+/* ---------- 詳細資料視窗 ---------- */
+function renderModal() {
+  const movie = state.selected;
+  if (!changed("modal", movie ? String(movieId(movie)) : "")) return;
+
+  const host = $("modal-host");
+  setChildren(host);
+  if (!movie) return;
+
+  const meta = movie.meta;
+  const rows = [
+    ["片名 (title)", meta && meta.title],
+    ["原始片名 (original_title)", meta && meta.original_title],
+    ["是否成人片 (adult)", tick(meta && meta.adult)],
+    ["是否為影片 (video)", tick(meta && meta.video)],
+    ["類型 (genre_ids)", meta && meta.genre_ids && meta.genre_ids.length ? genreNames(meta.genre_ids) : "-"],
+    ["原始語言 (original_language)", (meta && meta.original_language) || "-"],
+    ["上映日期 (release_date)", (meta && meta.release_date) || "-"],
+    ["評分 (vote_average)", meta && meta.vote_average != null ? `★ ${meta.vote_average.toFixed(1)}` : "-"],
+    ["評分人數 (vote_count)", (meta && meta.vote_count) ?? "-"],
+    ["熱門度 (popularity)", meta && meta.popularity != null ? meta.popularity.toFixed(2) : "-"],
+  ];
+
+  host.appendChild(el("div", { class: "modal-overlay", onClick: closeModal },
+    el("div", { class: "modal-card", onClick: (event) => event.stopPropagation() },
+      el("button", {
+        type: "button", class: "modal-close", "aria-label": "關閉", text: "×", onClick: closeModal,
+      }),
+
+      el("div", { class: "modal-hero" },
+        meta && meta.backdrop_path && el("img", {
+          src: IMG_ORIGINAL + meta.backdrop_path, alt: "", class: "modal-backdrop",
+        }),
+        el("div", { class: "modal-hero-content" },
+          meta && meta.poster_path
+            ? el("img", { src: IMG_MEDIUM + meta.poster_path, alt: "", class: "modal-poster" })
+            : el("div", { class: "modal-poster placeholder", text: "無海報" }),
+          el("div", { class: "modal-hero-text" },
+            el("h2", { class: "modal-title", text: movie.title }),
+            meta && meta.title && meta.title !== movie.title
+              && el("div", { class: "modal-subtitle" }, "TMDB 片名：", meta.title),
+            el("div", { class: "modal-rating" },
+              el("span", { class: "rating-star", text: "★" }), " ",
+              meta && meta.vote_average != null ? meta.vote_average.toFixed(1) : "-",
+              el("span", { class: "rating-count" },
+                "(", String((meta && meta.vote_count) ?? 0), " 人評分)"))))),
+
+      meta && meta.overview && el("div", { class: "modal-section" },
+        el("h3", { class: "modal-section-title", text: "劇情簡介 (overview)" }),
+        el("p", { class: "modal-overview", text: meta.overview })),
+
+      el("div", { class: "modal-section" },
+        el("h3", { class: "modal-section-title", text: "TMDB 資料" }),
+        el("table", { class: "modal-fields" },
+          el("tbody", {}, rows.map(([label, value]) => el("tr", {},
+            el("td", { class: "modal-field-label", text: label }),
+            el("td", { class: "modal-field-value", text: value == null ? "" : String(value) })))))),
+
+      // 只有真的在那家影城上映才點得下去
+      el("div", { class: "modal-footer" }, CINEMAS.map((cinema) => {
+        const showing = (movie.sources || []).includes(cinema.key);
+        return el("a", {
+          href: showing ? cinema.url : null,
+          target: "_blank", rel: "noopener noreferrer",
+          class: `booking-btn${showing ? "" : " disabled"}`,
+          "aria-disabled": String(!showing),
+          onClick: (event) => { if (!showing) event.preventDefault(); },
+        }, "前往", cinema.label, "訂票");
+      })))));
+}
+
+function tick(value) {
+  return value === true ? "是" : value === false ? "否" : "-";
+}
+
+
+/* --------------------------------------------------------------------------
+ * 啟動
+ * -------------------------------------------------------------------------- */
+$("movie-search").addEventListener("input", (event) => {
+  state.search = event.target.value;
+  render();
+});
+
+$("chat-send").addEventListener("click", () => sendChat($("chat-input").value));
+
+$("chat-input").addEventListener("input", updateSendButton);
+$("chat-input").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") sendChat($("chat-input").value);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && state.selected) closeModal();
+});
+
+render();
+
+// 類型對照表和兩家影城同時開始抓，彼此不用等
+loadGenres();
+for (const cinema of CINEMAS) loadCinema(cinema);
+</script>
+</body>
+</html>

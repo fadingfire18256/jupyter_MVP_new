@@ -1,0 +1,16 @@
+# Python 編譯產物
+__pycache__/
+*.py[cod]
+
+# Jupyter
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+
+# Word 開啟中的暫存檔
+~$*
+
+# 注意：.env 有意納入版控（私有 repo 的課程共用金鑰）。
+# 若改成公開 repo，請先把下一行的註解拿掉並清掉 git 歷史裡的金鑰。
+# .env
