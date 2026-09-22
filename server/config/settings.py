@@ -15,7 +15,7 @@ STATIC_DIR = BASE_DIR / "static"
 # 教學用途，正式部署要改成從環境變數讀取
 SECRET_KEY = "django-insecure-jupyter-teaching-package"
 DEBUG = True
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = ["127.0.0.1", "localhost", "[::1]"]
 
 INSTALLED_APPS = [
     "cinema",
@@ -23,6 +23,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -38,3 +39,4 @@ USE_TZ = True
 
 # 前端和 API 都由這個服務提供（同一個網域），
 # 所以不需要 CORS 設定，前端也不需要任何 build 步驟。
+CSRF_FAILURE_VIEW = "cinema.views.csrf_failure"

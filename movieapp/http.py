@@ -44,6 +44,11 @@ def fetch_json(
     把錯誤當成一般的值傳回去，呼叫端就不必到處包 try/except，
     也不會因為一家影城掛掉就讓整個服務噴 500。
     """
+    from movieapp import config
+    if config.is_demo():
+        from movieapp.demo import response_for
+        return response_for(url, params)
+
     try:
         import requests
     except ImportError:

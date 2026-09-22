@@ -43,6 +43,8 @@ ZH_TW_GENRES = {
 
 
 def _headers():
+    if config.is_demo():
+        return {"accept": "application/json"}
     return {
         "Authorization": f"Bearer {config.tmdb_token()}",
         "accept": "application/json",
@@ -59,7 +61,7 @@ def search(query, language="zh-TW", use_cache=True):
     if not query:
         return [], "缺少查詢字串"
 
-    cache_key = f"{query.lower()}|{language}"
+    cache_key = f"{config.is_demo()}|{query.lower()}|{language}"
     if use_cache:
         hit = _CACHE.get(cache_key)
         if hit and time.time() - hit[0] < _CACHE_TTL:
@@ -109,7 +111,7 @@ def match_score(query, movie):
         return 0.0
     if q == title or q == original:
         return 1.0
-    if q in title or title in q or q in original or original in q:
+    if any(name and (q in name or name in q) for name in (title, original)):
         return 0.9
     return max(
         difflib.SequenceMatcher(None, q, title).ratio(),

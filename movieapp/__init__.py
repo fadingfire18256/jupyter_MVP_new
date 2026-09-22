@@ -1,7 +1,7 @@
 """電影整合系統的核心邏輯層。
 
-這一層是「唯一真相」：notebook 和 Django 服務都只是它的使用者，
-自己不藏任何邏輯。
+這一層是共用的 Python 核心：由 Notebook 產生，供 Notebook 與 Django 匯入。
+前端保留即時篩選與顯示，聊天提示統一由這一層建立。
 
 裡面每一個 .py 都是 notebook 用 %%writefile 產生的：
   * config.py / http.py                      —— 00_環境設定

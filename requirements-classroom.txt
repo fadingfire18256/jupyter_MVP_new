@@ -1,0 +1,5 @@
+# -*- coding: utf-8 -*-
+# 學生上課環境，包含應用程式與 JupyterLab。
+-r requirements.txt
+jupyterlab==4.6.4
+ipykernel==6.29.5

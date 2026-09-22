@@ -44,6 +44,9 @@ def load_env(path: str | Path | None = None, override: bool = False) -> dict:
 
     極簡實作，不依賴 python-dotenv —— 只認 KEY=VALUE，# 開頭是註解。
     .env 不存在也沒關係，get_key() 會在需要時當場詢問。
+
+    override=True 時，.env 裡有填的值會蓋掉既有的環境變數；
+    setup() 用它，讓「改完 .env 重跑開場格」就生效。空值不會清掉既有設定。
     """
     target = Path(path) if path else env_path()
     if not target.exists():
@@ -57,8 +60,10 @@ def load_env(path: str | Path | None = None, override: bool = False) -> dict:
         key, _, value = line.partition("=")
         key = key.strip()
         value = value.strip().strip('"').strip("'")
-        if override or not os.environ.get(key):
-            os.environ[key] = value
+        if override and value:
+            os.environ[key] = value      # 重新載入：.env 裡有填的值一律以它為準
+        elif not os.environ.get(key):
+            os.environ[key] = value      # 第一次載入：已經設定的環境變數優先
         loaded[key] = value
     return loaded
 
@@ -200,17 +205,34 @@ def save_keys(**values) -> Path:
 # --------------------------------------------------------------------------
 # 每本 notebook 的開場
 # --------------------------------------------------------------------------
-def setup(requires=()) -> None:
+# 每本教材預設使用固定資料；需要真實 API 時才明確切換。
+def is_demo() -> bool:
+    mode = os.environ.get("MOVIEAPP_MODE", "demo").strip().lower()
+    if mode not in ("demo", "live"):
+        raise ValueError("MOVIEAPP_MODE 只能是 demo 或 live")
+    return mode == "demo"
+
+
+def set_mode(mode: str) -> None:
+    if mode not in ("demo", "live"):
+        raise ValueError("模式只能是 demo 或 live")
+    os.environ["MOVIEAPP_MODE"] = mode
+
+
+def setup(requires=(), mode="demo") -> None:
     """每本 notebook 第一格呼叫：確認 sys.path、載入 .env、檢查前置模組。
 
     requires 列出這本 notebook 需要、但由前面 notebook 產生的模組。
     例如 03 需要 setup(requires=["sources", "tmdb"])，
     學員若跳著執行會得到明確的指示，而不是看不懂的 ImportError。
+
+    重跑 setup() 會以 .env 目前的內容為準重新載入金鑰，改過金鑰不用重啟 kernel。
     """
+    set_mode(mode)
     if str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))
     ensure_env_file()
-    load_env()
+    load_env(override=True)   # 改過 .env 之後重跑這一格就生效
 
     missing = [m for m in requires if not (PKG_DIR / f"{m}.py").exists()]
     if missing:
@@ -220,7 +242,7 @@ def setup(requires=()) -> None:
         ]
         raise RuntimeError("缺少前置模組，這本 notebook 還不能跑：\n" + "\n".join(lines))
 
-    print(f"環境就緒｜根目錄：{ROOT}")
+    print(f"環境就緒｜模式：{'示範資料（不連外）' if is_demo() else '真實 API'}｜根目錄：{ROOT}")
 
 
 # --------------------------------------------------------------------------
@@ -260,8 +282,8 @@ def doctor() -> bool:
     """
     rows = []
 
-    ok_py = sys.version_info >= (3, 9)
-    rows.append((ok_py, "Python 版本", f"{sys.version.split()[0]}（需要 3.9 以上）"))
+    ok_py = sys.version_info >= (3, 12)
+    rows.append((ok_py, "Python 版本", f"{sys.version.split()[0]}（課程使用 3.12 以上）"))
 
     for pkg, label in [
         ("requests", "requests 套件"),
@@ -271,10 +293,15 @@ def doctor() -> bool:
         rows.append((_has_module(pkg), label,
                      "已安裝" if _has_module(pkg) else "缺少，請執行 %pip install -r ../requirements.txt"))
 
-    for mod in ("config", "http"):
+    # 本章寫出的三個檔案。demo.py 是示範模式的資料來源，缺了它每一章的 demo 都跑不起來；
+    # 它們都在收合的儲存格裡，最容易被漏掉，所以列為必要項目。
+    missing_here = []
+    for mod in ("config", "http", "demo"):
         exists = (PKG_DIR / f"{mod}.py").exists()
+        if not exists:
+            missing_here.append(mod)
         rows.append((exists, f"movieapp/{mod}.py",
-                     "已產生" if exists else "尚未產生（由 00_環境設定.ipynb 寫出）"))
+                     "已產生" if exists else "尚未產生（由 00_環境設定.ipynb 第 2 節收合的儲存格寫出）"))
 
     for mod, owner in _MODULE_OWNER.items():
         exists = (PKG_DIR / f"{mod}.py").exists()
@@ -283,7 +310,7 @@ def doctor() -> bool:
     load_env()
     for label, key in [("TMDB 金鑰", TMDB_KEY_NAME), ("Gemini 金鑰", GEMINI_KEY_NAME)]:
         val = os.environ.get(key, "").strip()
-        rows.append((bool(val), label, f"已設定（{val[:6]}…）" if val else "未設定，需要時會提示輸入"))
+        rows.append((bool(val), label, "已設定" if val else ("示範模式不需要" if is_demo() else "未設定，需要時會提示輸入")))
 
     page = ROOT / "server" / "static" / "index.html"
     rows.append((page.exists(), "前端 index.html",
@@ -296,7 +323,7 @@ def doctor() -> bool:
         print(f"  {'[OK]' if ok else '[--]'}  {pad(label, width)}  {detail}")
     print("=" * (width + 40))
 
-    hard_fail = not ok_py or not _has_module("requests")
+    hard_fail = not ok_py or not _has_module("requests") or bool(missing_here)
     print("結論：" + ("環境沒問題，可以開始。" if not hard_fail
                     else "有必要項目未通過，請先處理上面標示 [--] 的項目。"))
     return not hard_fail
