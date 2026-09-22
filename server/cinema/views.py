@@ -1,7 +1,7 @@
 """API 視圖 —— 全部都是薄殼。
 
 注意每一支的長度：真正的邏輯都在 movieapp/ 裡，
-這裡只負責「把 HTTP 請求翻譯成函式呼叫，再把結果包成 JSON」。
+這裡負責驗證 HTTP 請求、呼叫核心函式，再把結果包成 JSON。
 
 這就是為什麼要把邏輯抽出去：同一份程式碼，
 notebook 直接 import 來用，這個服務也 import 來用，
@@ -11,11 +11,14 @@ notebook 直接 import 來用，這個服務也 import 來用，
 要修改請回去改那一格，不要直接編輯這裡。
 """
 
-import json
 import time
 from pathlib import Path
 
 from django.http import FileResponse, Http404, JsonResponse
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.http import require_GET
+
+from .payloads import chat_input, read_object
 
 from movieapp import config, gemini, merge, sources, tmdb
 
@@ -35,6 +38,8 @@ def _needs_key(which):
     為什麼不是 500？因為這不是程式壞了，是「還沒設定」——
     一個使用者按幾下就能解決的狀態，值得有自己的回應方式。
     """
+    if config.is_demo():
+        return None
     name = config.TMDB_KEY_NAME if which == "tmdb" else config.GEMINI_KEY_NAME
     if config.has_key(name):
         return None
@@ -100,11 +105,14 @@ def tmdb_genres(request):
 # 整合後的電影清單（03）
 # --------------------------------------------------------------------------
 def movies(request):
-    """前端唯一需要的資料端點：兩家影城 -> TMDB 補資料 -> 跨來源去重。
+    """一次取得整合片單的資料端點：兩家影城 -> TMDB 補資料 -> 跨來源去重。
 
     整條流程都在 merge.catalog() 裡，這裡一樣只是薄殼。
     某一家影城掛掉不會讓整份清單失敗，錯誤放在 errors 欄位一起回去。
     """
+    blocked = _needs_key("tmdb")
+    if blocked is not None:
+        return blocked
     catalog, genre_names, errors = merge.catalog()
     return JsonResponse({
         "movies": catalog,
@@ -121,29 +129,17 @@ def chat(request):
     if request.method != "POST":
         return JsonResponse({"error": "請使用 POST"}, status=405)
 
-    try:
-        body = json.loads(request.body)
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        return JsonResponse({"error": "無效的請求格式"}, status=400)
-
-    messages = body.get("messages") or []
-    latest = ""
-    for message in reversed(messages):
-        if message.get("role") == "user":
-            latest = str(message.get("content", "")).strip()
-            break
-    if not latest:
-        return JsonResponse({"error": "沒有使用者訊息"}, status=400)
-
+    body, invalid = read_object(request)
+    if invalid is not None:
+        return invalid
+    payload, error = chat_input(body)
+    if error:
+        return JsonResponse({"error": error}, status=400)
     blocked = _needs_key("gemini")
-    if blocked:
+    if blocked is not None:
         return blocked
-
-    reply, error = gemini.ask(
-        latest,
-        system=str(body.get("system", "")).strip() or None,
-        session_id=str(body.get("session_id", "")).strip() or None,
-    )
+    system = gemini.build_system_prompt(payload["movies"], payload["genres"])
+    reply, error = gemini.ask(payload["message"], system=system, session_id=payload["session_id"])
     return _json({"reply": reply}, error)
 
 
@@ -170,21 +166,23 @@ def keys(request):
         return JsonResponse({"error": "只接受本機的金鑰設定請求"}, status=403)
 
     if request.method == "GET":
-        return JsonResponse({"keys": config.key_status()})
+        return JsonResponse({"keys": config.key_status(), "mode": "demo" if config.is_demo() else "live"})
 
     if request.method != "POST":
         return JsonResponse({"error": "請使用 GET 或 POST"}, status=405)
 
-    try:
-        body = json.loads(request.body)
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        return JsonResponse({"error": "無效的請求格式"}, status=400)
+    body, invalid = read_object(request)
+    if invalid is not None:
+        return invalid
 
     # 空字串代表「這一把不動」，這樣只換其中一把時不會把另一把清掉
     updates = {}
     for field, name in (("tmdb", config.TMDB_KEY_NAME),
                         ("gemini", config.GEMINI_KEY_NAME)):
-        value = str(body.get(field, "")).strip()
+        value = body.get(field, "")
+        if not isinstance(value, str) or len(value) > 1000 or "\n" in value or "\r" in value:
+            return JsonResponse({"error": "金鑰必須是單行文字，長度不得超過 1000"}, status=400)
+        value = value.strip()
         if value:
             updates[name] = value
 
@@ -216,9 +214,27 @@ def server_time(request):
 # --------------------------------------------------------------------------
 # 前端網頁
 # --------------------------------------------------------------------------
+@require_GET
+@ensure_csrf_cookie
 def index(request):
     """把 build 好的前端首頁送出去。"""
     page = STATIC_DIR / "index.html"
     if not page.exists():
         raise Http404("找不到前端網頁，請確認 server/static/index.html 存在")
     return FileResponse(page.open("rb"), content_type="text/html")
+
+ASSETS = {"styles.css": "text/css", "state.js": "text/javascript", "data.js": "text/javascript",
+          "actions.js": "text/javascript", "render.js": "text/javascript", "keys.js": "text/javascript",
+          "app.js": "text/javascript"}
+
+
+@require_GET
+def asset(request, filename):
+    """只提供講義列出的靜態檔案，避免任意路徑讀取。"""
+    if filename not in ASSETS or not (STATIC_DIR / filename).is_file():
+        raise Http404("找不到前端檔案")
+    return FileResponse((STATIC_DIR / filename).open("rb"), content_type=ASSETS[filename])
+
+
+def csrf_failure(request, reason=""):
+    return JsonResponse({"error": "請重新整理本機網頁，再提交操作。"}, status=403)

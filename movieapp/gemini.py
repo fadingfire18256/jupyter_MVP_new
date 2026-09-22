@@ -17,8 +17,8 @@ from movieapp.http import fetch_json
 
 API_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
 
-# 模型會下架。gemini-2.5-flash 和 gemini-2.0-flash 都已經對新使用者關閉，
-# 呼叫會收到 404 not_found。主模型不可用時自動往後試。
+# 真實模式使用的模型順序；可用性以官方文件及帳戶實際回應為準。
+# 示範模式不呼叫模型。
 MODELS = ["gemini-3.6-flash", "gemini-flash-latest"]
 
 # 每個 session_id 目前接到哪一輪對話
@@ -47,7 +47,7 @@ def build_system_prompt(movies, genre_names=None, now=None):
     """
     genre_names = genre_names or {}
     if not movies:
-        return ""
+        return "你是電影推薦助手，請用繁體中文回答。目前片單為空，請說明沒有可供推薦的資料，不要編造電影。"
 
     lines = []
     for index, movie in enumerate(movies[:MAX_MOVIES_IN_PROMPT], 1):
@@ -85,8 +85,8 @@ def _describe_error(error):
     text = str(error or "")
     if "429" in text:
         return (
-            "Gemini 配額已用完（429）。免費額度是綁在金鑰上計算的，"
-            "全班共用一把金鑰時很容易同時撞到。可以等幾分鐘再試，或改用自己的金鑰。"
+            "Gemini 配額已用完（429）。速率限制按專案計算，同一專案的金鑰共用限制；"
+            "請查看 AI Studio 的限制與用量，再依限制等待重試或調整請求量。"
         )
     if "404" in text or "not found" in text.lower():
         return f"模型不存在或已下架：{text}"
@@ -116,6 +116,10 @@ def ask(message, system=None, session_id=None, models=None, retries=1):
     message = str(message or "").strip()
     if not message:
         return "", "沒有訊息內容"
+
+    if config.is_demo():
+        from movieapp.demo import chat_reply
+        return chat_reply(message, system), None
 
     payload_base = {"input": message}
     if system:

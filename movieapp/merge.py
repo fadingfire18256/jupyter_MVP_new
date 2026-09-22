@@ -8,6 +8,7 @@
 """
 
 import re
+from datetime import date
 
 # 來源代號對應的顯示名稱
 SOURCE_LABELS = {"showtimes": "秀泰影城", "miramar": "美麗華影城"}
@@ -106,10 +107,16 @@ def apply_filters(
         def sort_key(movie):
             value = (movie.get("meta") or {}).get(sort_by)
             if sort_by == "release_date":
-                return _release_month(value) or 0
-            return value or 0
+                try:
+                    return date.fromisoformat(str(value)).toordinal()
+                except ValueError:
+                    return None
+            return value
 
-        result.sort(key=sort_key, reverse=descending)
+        # 缺值在升冪、降冪都放最後；日期排序保留「日」，篩選才使用月份。
+        valid = [m for m in result if sort_key(m) is not None]
+        missing = [m for m in result if sort_key(m) is None]
+        result = sorted(valid, key=sort_key, reverse=descending) + missing
 
     return result
 

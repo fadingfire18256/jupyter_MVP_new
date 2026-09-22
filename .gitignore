@@ -1,17 +1,20 @@
-# Python 編譯產物
+# Python / Jupyter / local environment
 __pycache__/
 *.py[cod]
-
-# Jupyter
 .ipynb_checkpoints/
-
-# macOS
-.DS_Store
-
-# Word 開啟中的暫存檔
-~$*
-
-# 金鑰不進版控。版本庫裡只有 .env.example（值是空的）——
-# 執行 00_環境設定.ipynb 或啟動伺服器時會照它建一份 .env，
-# 值請用網頁上的「API 金鑰」按鈕填。
+.venv/
+venv/
 .env
+.env.*
+!.env.example
+
+# Local teaching server and verification output
+.classroom-server.log
+.classroom-server.pid
+.classroom-server.json
+.lesson-runs/
+
+# OS and Word temporary files
+.DS_Store
+Thumbs.db
+~$*

@@ -1,0 +1,5 @@
+# -*- coding: utf-8 -*-
+# 講師環境，包含上課環境與整套 Notebook 驗證工具。
+-r requirements-classroom.txt
+nbformat==5.11.1
+nbclient==0.11.0
